@@ -48,7 +48,7 @@ namespace multirotor_sim
         typedef struct
         {
             double measurement_time;
-            VectorXd z;
+            VectorXd location_pix;
             MatrixXd R;
             int feature_id;
             double depth;

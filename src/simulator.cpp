@@ -462,14 +462,14 @@ namespace multirotor_sim
                 {
                     measurement_t meas;
                     meas.measurement_time = t_ + camera_time_offset_;
-                    meas.z = it->pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
+                    meas.location_pix = it->pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
                     meas.R = feat_R_;
                     meas.feature_id = (*it).id;
                     meas.depth = it->depth + depth_noise_stdev_ * normal_(rng_);
                     camera_measurements_buffer_.push_back(std::pair<double, measurement_t>{pub_time, meas});
                     DBG("update feature - ID = %d\n", it->id);
                     it++;
-                } else // If it is not still visible
+                } else // If the feature is not still visible
                 {
                     if (it->zeta(2, 0) < 0)
                     {
@@ -498,7 +498,7 @@ namespace multirotor_sim
                 // Create a measurement for this new feature
                 measurement_t meas;
                 meas.measurement_time = t_ + camera_time_offset_;
-                meas.z = new_feature.pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
+                meas.location_pix = new_feature.pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
                 meas.R = feat_R_;
                 meas.feature_id = new_feature.id;
                 meas.depth = new_feature.depth + depth_noise_stdev_ * normal_(rng_);
@@ -515,7 +515,7 @@ namespace multirotor_sim
             img_.id = image_id_;
             for (auto zit = camera_measurements_buffer_.begin(); zit != camera_measurements_buffer_.end(); zit++)
             {
-                img_.pixs.push_back(zit->second.z);
+                img_.pixs.push_back(zit->second.location_pix);
                 img_.feat_ids.push_back(zit->second.feature_id);
                 img_.depths.push_back(zit->second.depth);
             }
@@ -568,17 +568,17 @@ namespace multirotor_sim
         {
             measurement_t meas;
             meas.measurement_time = t_ + mocap_time_offset_;
-            meas.z.resize(7, 1);
+            meas.location_pix.resize(7, 1);
 
             // Add noise to mocap measurements and transform into mocap coordinate frame
             Vector3d noise = randomNormal<Vector3d>(position_noise_stdev_, normal_, rng_);
             Vector3d I_p_b_I = state().p; // p_{b/I}^I
             Vector3d I_p_m_I = I_p_b_I + state().q.rota(p_b2m_); // p_{m/I}^I = p_{b/I}^I + R(q_I^b)^T (p_{m/b}^b)
-            meas.z.topRows<3>() = I_p_m_I + noise;
+            meas.location_pix.topRows<3>() = I_p_m_I + noise;
 
             noise = randomNormal<Vector3d>(attitude_noise_stdev_, normal_, rng_);
             Quatd q_I_m = state().q * q_b2m_; //  q_I^m = q_I^b * q_b^m
-            meas.z.bottomRows<4>() = (q_I_m + noise).elements();
+            meas.location_pix.bottomRows<4>() = (q_I_m + noise).elements();
 
             meas.R = mocap_R_;
 
@@ -594,7 +594,7 @@ namespace multirotor_sim
             if (mocap_enabled_)
             {
                 for (estVec::iterator it = est_.begin(); it != est_.end(); it++)
-                    (*it)->mocapCallback(m->measurement_time, Xformd(m->z), m->R);
+                    (*it)->mocapCallback(m->measurement_time, Xformd(m->location_pix), m->R);
             }
             mocap_measurement_buffer_.erase(mocap_measurement_buffer_.begin());
         }

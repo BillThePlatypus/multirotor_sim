@@ -28,7 +28,7 @@ add_library(multirotor_sim SHARED
     src/dynamics.cpp
     src/simulator.cpp
     src/environment.cpp
-)
+        src/SimulatedCamera.cpp include/multirotor_sim/SimulatedCamera.h)
 target_link_libraries(multirotor_sim
     stdc++fs
     ${YAML_CPP_LIBRARIES}
