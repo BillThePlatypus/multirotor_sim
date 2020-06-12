@@ -10,7 +10,7 @@ using namespace multirotor_sim;
 
 TEST (Gnss, lla2ecef)
 {
-    Vector3d lla = {40.246184 * DEG2RAD , -111.647769 * DEG2RAD, 1387.997511}; // BYU Campus
+    Vector3d lla = {40.246184 * DEG2RAD, -111.647769 * DEG2RAD, 1387.997511}; // BYU Campus
     Vector3d ecef_known = {-1798810.23, -4532232.54, 4099784.74};
 
     Vector3d ecef_calc = WSG84::lla2ecef(lla);
@@ -21,7 +21,7 @@ TEST (Gnss, lla2ecef)
 TEST (Gnss, ecef2lla)
 {
     Vector3d ecef = {-1798810.23, -4532232.54, 4099784.74};
-    Vector3d lla_known = {40.246184 * DEG2RAD , -111.647769 * DEG2RAD, 1387.998309};
+    Vector3d lla_known = {40.246184 * DEG2RAD, -111.647769 * DEG2RAD, 1387.998309};
 
     Vector3d lla_calc = WSG84::ecef2lla(ecef);
 
@@ -31,7 +31,7 @@ TEST (Gnss, ecef2lla)
 TEST (Gnss, ecef2lla2ecef)
 {
     Vector3d ecef = {-1798810.23, -4532232.54, 4099784.74};
-    Vector3d lla_known = {40.246184 * DEG2RAD , -111.647769 * DEG2RAD, 1387.998309};
+    Vector3d lla_known = {40.246184 * DEG2RAD, -111.647769 * DEG2RAD, 1387.998309};
 
     Vector3d lla_calc = WSG84::ecef2lla(ecef);
     Vector3d ecef_calc = WSG84::lla2ecef(lla_calc);
@@ -68,12 +68,12 @@ TEST (Gnss, ecef2ned_check_axes)
     double cl = std::cos(lla0(1));
 
     Matrix3d R; // https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates
-    R << -sp*cl, -sl, -cp*cl,
-         -sp*sl,  cl, -cp*sl,
-          cp,     0,  -sp;
+    R << -sp * cl, -sl, -cp * cl,
+            -sp * sl, cl, -cp * sl,
+            cp, 0, -sp;
     EXPECT_MAT_NEAR(x_e2n.q().R(), R.transpose(), 1e-8);
 
-    Vector3d E_r_N_E = 1.0*ecef0;
+    Vector3d E_r_N_E = 1.0 * ecef0;
     E_r_N_E /= E_r_N_E.stableNorm();
     Vector3d E_z_N = x_e2n.q().rota(e_z);
     EXPECT_MAT_NEAR(-1.0 * E_z_N, E_r_N_E, 3e-3);
@@ -113,12 +113,25 @@ class GnssTestEstimator : public EstimatorBase
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    void imuCallback(const double& t, const Vector6d& z, const Matrix6d& R) override {}
-    void altCallback(const double& t, const Vector1d& z, const Matrix1d& R) override {}
-    void mocapCallback(const double& t, const Xformd& z, const Matrix6d& R) override {}
-    void voCallback(const double& t, const Xformd& z, const Matrix6d& R) override {}
-    void rawGnssCallback(const GTime& t, const VecVec3& z, const VecMat3& R, std::vector<Satellite, aligned_allocator<Satellite>>& sat, const std::vector<bool>& slip) override {}
-    void gnssCallback(const double& t, const Vector6d& z, const Matrix6d& R) override
+
+    void imuCallback(const double &t, const Vector6d &z, const Matrix6d &R) override
+    {}
+
+    void altCallback(const double &t, const Vector1d &z, const Matrix1d &R) override
+    {}
+
+    void mocapCallback(const double &t, const Xformd &z, const Matrix6d &R) override
+    {}
+
+    void voCallback(const double &t, const Xformd &z, const Matrix6d &R) override
+    {}
+
+    void rawGnssCallback(const GTime &t, const VecVec3 &z, const VecMat3 &R,
+                         std::vector<Satellite, aligned_allocator<Satellite>> &sat,
+                         const std::vector<bool> &slip) override
+    {}
+
+    void gnssCallback(const double &t, const Vector6d &z, const Matrix6d &R) override
     {
         call_count++;
         z_last = z;
@@ -128,12 +141,15 @@ public:
     Vector6d z_last;
 };
 
-class GnssTest : public ::testing::Test {
-public: EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+class GnssTest : public ::testing::Test
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 protected:
     GnssTest() :
-        sim()
+            sim()
     {}
+
     void SetUp() override
     {
         std::string filename = "tmp.params.yaml";

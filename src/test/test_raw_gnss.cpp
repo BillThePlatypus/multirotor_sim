@@ -15,13 +15,24 @@ class RawGnssTestEstimator : public EstimatorBase
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    void imuCallback(const double& t, const Vector6d& z, const Matrix6d& R) override {}
-    void altCallback(const double& t, const Vector1d& z, const Matrix1d& R) override {}
-    void mocapCallback(const double& t, const xform::Xformd& z, const Matrix6d& R) override {}
-    void voCallback(const double& t, const xform::Xformd& z, const Matrix6d& R) override {}
-    void gnssCallback(const double& t, const Vector6d& z, const Matrix6d& R) override {}
-    void rawGnssCallback(const GTime& t, const VecVec3& z, const VecMat3& R, SatVec& sat,
-                         const std::vector<bool>& slip) override
+
+    void imuCallback(const double &t, const Vector6d &z, const Matrix6d &R) override
+    {}
+
+    void altCallback(const double &t, const Vector1d &z, const Matrix1d &R) override
+    {}
+
+    void mocapCallback(const double &t, const xform::Xformd &z, const Matrix6d &R) override
+    {}
+
+    void voCallback(const double &t, const xform::Xformd &z, const Matrix6d &R) override
+    {}
+
+    void gnssCallback(const double &t, const Vector6d &z, const Matrix6d &R) override
+    {}
+
+    void rawGnssCallback(const GTime &t, const VecVec3 &z, const VecMat3 &R, SatVec &sat,
+                         const std::vector<bool> &slip) override
     {
         time_last = t;
         call_count++;
@@ -38,11 +49,13 @@ public:
 };
 
 
-class RawGpsTest : public ::testing::Test {
-public: EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+class RawGpsTest : public ::testing::Test
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 protected:
     RawGpsTest() :
-        sim(false, 1)
+            sim(false, 1)
     {}
 
     void SetUp() override
@@ -76,6 +89,7 @@ protected:
         sim.register_estimator(&est);
         sim.t_ = 0.0;
     }
+
     ReferenceController cont;
     Simulator sim;
     RawGnssTestEstimator est;
@@ -162,12 +176,12 @@ TEST_F (RawGpsTest, LeastSquaresPositioningPseudoranges)
             Vector2d sat_clk_bias;
             sim.satellites_[i].computePositionVelocityClock(t, sat_pos, sat_vel, sat_clk_bias);
 
-            Vector3d z ;
+            Vector3d z;
             sim.satellites_[i].computeMeasurement(t, xhat, vel_ecef, Vector2d::Zero(), z);
             b(i) = est.z_last[i](0) - z(0);
 
-            A.block<1,3>(i,0) = (xhat - sat_pos).normalized().transpose();
-            A(i,3) = Satellite::C_LIGHT;
+            A.block<1, 3>(i, 0) = (xhat - sat_pos).normalized().transpose();
+            A(i, 3) = Satellite::C_LIGHT;
         }
 
         ColPivHouseholderQR<Matrix<double, 15, 4>> solver(A);

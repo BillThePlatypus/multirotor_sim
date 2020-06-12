@@ -15,9 +15,10 @@ class MCLogger
 
 public:
     MCLogger(string directory, string prefix);
+
     ~MCLogger();
 
-    void log(const Analytics& a);
+    void log(const Analytics &a);
 
 private:
 
@@ -33,16 +34,18 @@ private:
             stream_.open(filename);
             mutex_.unlock();
         }
+
         void close()
         {
             mutex_.lock();
             stream_.close();
             mutex_.unlock();
         }
+
         void write(std::vector<double> data)
         {
             mutex_.lock();
-            stream_.write((char*)data.data(), sizeof(double)*data.size());
+            stream_.write((char *) data.data(), sizeof(double) * data.size());
             mutex_.unlock();
         }
     };
