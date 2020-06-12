@@ -39,10 +39,15 @@ namespace multirotor_sim
 class Simulator
 {
 public:
+  /**
+   * A camera or mocap measurement
+   * @param size
+   * @return
+   */
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   typedef struct
   {
-    double t;
+    double measurement_time;
     VectorXd z;
     MatrixXd R;
     int feature_id;
@@ -184,8 +189,8 @@ public:
   // Camera (Features)
   bool camera_enabled_;
   int num_features_;
-  xform::Xformd x_b2c_;
-  xform::Xformd x_I2c_;
+  xform::Xformd transform_body_to_camera_;
+  xform::Xformd transform_inertial_to_camera_;
   Matrix2d feat_R_;
   double pixel_noise_stdev_;
   double camera_update_rate_;

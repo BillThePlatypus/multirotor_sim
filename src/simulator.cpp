@@ -198,8 +198,8 @@ void Simulator::init_camera()
   get_yaml_node("camera_update_rate", param_filename_, camera_update_rate_);
   get_yaml_eigen("cam_center", param_filename_, cam_.cam_center_);
   get_yaml_eigen("image_size", param_filename_, cam_.image_size_);
-  get_yaml_eigen("q_b_c", param_filename_, x_b2c_.q_.arr_);
-  get_yaml_eigen("p_b_c", param_filename_, x_b2c_.t_);
+  get_yaml_eigen("q_b_c", param_filename_, transform_body_to_camera_.q_.arr_);
+  get_yaml_eigen("p_b_c", param_filename_, transform_body_to_camera_.t_);
   get_yaml_eigen("focal_len", param_filename_, cam_.focal_len_);
   get_yaml_node("pixel_noise_stdev", param_filename_, pixel_noise);
   get_yaml_node("loop_closure", param_filename_, loop_closure_);
@@ -413,7 +413,7 @@ void Simulator::use_custom_trajectory(TrajectoryBase *traj)
 
 void Simulator::update_camera_pose()
 {
-  x_I2c_ = state().X * x_b2c_;
+  transform_inertial_to_camera_ = state().X * transform_body_to_camera_;
 }
 
 
@@ -459,10 +459,10 @@ void Simulator::update_camera_meas()
     // Update feature measurements for currently tracked features
     for(auto it = tracked_points_.begin(); it != tracked_points_.end();)
     {
-      if (update_feature(*it))
+      if (update_feature(*it)) // If the feature is still visible
       {
         measurement_t meas;
-        meas.t = t_ + camera_time_offset_;
+        meas.measurement_time = t_ + camera_time_offset_;
         meas.z = it->pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
         meas.R = feat_R_;
         meas.feature_id = (*it).id;
@@ -471,7 +471,7 @@ void Simulator::update_camera_meas()
         DBG("update feature - ID = %d\n", it->id);
         it++;
       }
-      else
+      else // If it is not still visible
       {
         if (it->zeta(2,0) < 0)
         {
@@ -500,7 +500,7 @@ void Simulator::update_camera_meas()
 
       // Create a measurement for this new feature
       measurement_t meas;
-      meas.t = t_ + camera_time_offset_;
+      meas.measurement_time = t_ + camera_time_offset_;
       meas.z = new_feature.pixel + randomNormal<Vector2d>(pixel_noise_stdev_, normal_, rng_);
       meas.R = feat_R_;
       meas.feature_id = new_feature.id;
@@ -514,7 +514,7 @@ void Simulator::update_camera_meas()
   {
     // Populate the Image class with all feature measurements
     img_.clear();
-    img_.t = camera_measurements_buffer_[0].second.t;
+    img_.t = camera_measurements_buffer_[0].second.measurement_time;
     img_.id = image_id_;
     for (auto zit = camera_measurements_buffer_.begin(); zit != camera_measurements_buffer_.end(); zit++)
     {
@@ -570,7 +570,7 @@ void Simulator::update_mocap_meas()
   if (std::round((t_ - last_mocap_update_) * t_round_off_) / t_round_off_ >= 1.0/mocap_update_rate_)
   {
     measurement_t meas;
-    meas.t = t_ + mocap_time_offset_;
+    meas.measurement_time = t_ + mocap_time_offset_;
     meas.z.resize(7,1);
 
     // Add noise to mocap measurements and transform into mocap coordinate frame
@@ -597,7 +597,7 @@ void Simulator::update_mocap_meas()
     if (mocap_enabled_)
     {
       for (estVec::iterator it = est_.begin(); it != est_.end(); it++)
-        (*it)->mocapCallback(m->t, Xformd(m->z), m->R);
+        (*it)->mocapCallback(m->measurement_time, Xformd(m->z), m->R);
     }
     mocap_measurement_buffer_.erase(mocap_measurement_buffer_.begin());
   }
@@ -612,9 +612,9 @@ void Simulator::update_vo_meas()
   {
     // Compute position and attitude relative to the keyframe
     Xformd T_c2ck;
-    T_c2ck.t_ = x_b2c_.rotp(T_i2b.q().rotp(X_I2bk_.t() + X_I2bk_.q().inverse().rotp(x_b2c_.t()) -
-                                           (T_i2b.t() + T_i2b.q().inverse().rotp(x_b2c_.t()))));
-    T_c2ck.q_ = x_b2c_.q_.inverse() * T_i2b.q().inverse() * X_I2bk_.q().inverse() * x_b2c_.q_;
+    T_c2ck.t_ = transform_body_to_camera_.rotp(T_i2b.q().rotp(X_I2bk_.t() + X_I2bk_.q().inverse().rotp(transform_body_to_camera_.t()) -
+                                           (T_i2b.t() + T_i2b.q().inverse().rotp(transform_body_to_camera_.t()))));
+    T_c2ck.q_ = transform_body_to_camera_.q_.inverse() * T_i2b.q().inverse() * X_I2bk_.q().inverse() * transform_body_to_camera_.q_;
 
     for (estVec::iterator it = est_.begin(); it != est_.end(); it++)
       (*it)->voCallback(t_, T_c2ck, vo_R_);
@@ -732,6 +732,14 @@ void Simulator::update_measurements()
 }
 
 
+/**
+ * Takes a feature, and updates its pixel location on the camera.
+ * Checks if the feature is still visible. The feature loses visibility if it moves
+ * behind the camera, out of frame, or (???) if there are too many points
+ * @param feature the feature struct defining the feature location, as well as with a field
+ * to return the pixel location
+ * @return Whether or not the feature is still visible
+ */
 bool Simulator::update_feature(Feature &feature) const
 {
   if (feature.id > env_.get_points().size() || feature.id < 0)
@@ -739,7 +747,7 @@ bool Simulator::update_feature(Feature &feature) const
 
   // Calculate the bearing vector to the feature
   Vector3d pt = env_.get_points()[feature.id];
-  feature.zeta = x_I2c_.transformp(pt);
+  feature.zeta = transform_inertial_to_camera_.transformp(pt);
 
   // we can reject anything behind the camera
   if (feature.zeta(2) < 0.0)
@@ -760,7 +768,7 @@ bool Simulator::get_previously_tracked_feature_in_frame(Feature &feature)
 {
 
   Vector3d ground_pt;
-  env_.get_center_img_center_on_ground_plane(x_I2c_, ground_pt);
+  env_.get_center_img_center_on_ground_plane(transform_inertial_to_camera_, ground_pt);
   vector<Vector3d, aligned_allocator<Vector3d>> pts;
   vector<size_t> ids;
   if (env_.get_closest_points(ground_pt, num_features_, 2.0, pts, ids))
@@ -771,7 +779,7 @@ bool Simulator::get_previously_tracked_feature_in_frame(Feature &feature)
         continue;
       // Calculate the bearing vector to the feature
       Vector3d pt = env_.get_points()[ids[i]];
-      feature.zeta = x_I2c_.transformp(pt);
+      feature.zeta = transform_inertial_to_camera_.transformp(pt);
       if (feature.zeta(2) < 0.0)
         continue;
 
@@ -805,7 +813,7 @@ bool Simulator::get_feature_in_frame(Feature &feature, bool retrack)
 bool Simulator::create_new_feature_in_frame(Feature &feature)
 {
   // First, look for features in frame that are not currently being tracked
-  feature.id = env_.add_point(x_I2c_.t_, x_I2c_.q_, tracked_points_,
+  feature.id = env_.add_point(transform_inertial_to_camera_.t_, transform_inertial_to_camera_.q_, tracked_points_,
                               feature.zeta, feature.pixel, feature.depth);
   if (feature.id != -1)
   {
